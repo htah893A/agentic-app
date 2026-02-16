@@ -1,0 +1,57 @@
+{
+  "name": "@agentcore/root",
+  "version": "1.0.0",
+  "description": "A production-ready monorepo for AgentCore RAG Agent with CDK and Next.js",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:e2e": "turbo run test:e2e",
+    "lint": "turbo run lint",
+    "lint:check": "turbo run lint:check",
+    "format": "turbo run format",
+    "format:check": "turbo run format:check",
+    "type-check": "turbo run type-check",
+    "quality:check": "pnpm run lint:check && pnpm run format:check && pnpm run type-check",
+    "quality:fix": "pnpm run lint && pnpm run format",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "cdk:deploy": "pnpm --filter @agentcore/infra cdk deploy --all",
+    "cdk:synth": "pnpm --filter @agentcore/infra cdk synth",
+    "cdk:diff": "pnpm --filter @agentcore/infra cdk diff",
+    "cdk:destroy": "pnpm --filter @agentcore/infra cdk destroy --all",
+    "web:dev": "pnpm --filter @agentcore/web dev",
+    "web:build": "pnpm --filter @agentcore/web build",
+    "deploy": "./scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "eslint": "^9.15.0",
+    "prettier": "^3.3.3",
+    "turbo": "^2.3.3",
+    "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "keywords": [
+    "monorepo",
+    "aws",
+    "cdk",
+    "bedrock",
+    "agentcore",
+    "ai",
+    "chatbot",
+    "knowledge-base",
+    "rag",
+    "next.js",
+    "turborepo",
+    "pnpm"
+  ],
+  "author": "Hamza Tahir",
+  "license": "MIT"
+}
