@@ -1,11 +1,11 @@
-export { BedrockClient } from './bedrockClient';
-export { DynamoClient } from './dynamoClient';
-export { Logger } from './logger';
+export { Tables } from './dynamoDBClient';
+
+export { AgentCore } from './agentCore';
+
+export { createSuccessJsonResponse, createErrorJsonResponse } from './gatewayResponse';
 export {
-  createSuccessJsonResponse,
-  createErrorJsonResponse,
-} from './gatewayResponse';
-export {
+  AuthorizationError,
+  ValidationError,
   MissingEnvironmentVariable,
   MissingBodyData,
   MissingParameters,

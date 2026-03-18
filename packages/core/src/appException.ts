@@ -1,41 +1,55 @@
+export class AuthorizationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthorizationError';
+  }
+}
+
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
 export class MissingEnvironmentVariable extends Error {
-  override name = 'MissingEnvironmentVariable';
-  constructor(variableName: string) {
-    super(`Environment variable not passed: ${variableName}`);
+  constructor(message: string) {
+    super(message);
+    this.name = 'MissingEnvironmentVariable';
   }
 }
 
 export class MissingBodyData extends Error {
-  override name = 'MissingBodyData';
-  constructor() {
-    super(`Body data is empty`);
+  constructor(message: string) {
+    super(message);
+    this.name = 'MissingBodyData';
   }
 }
 
 export class MissingParameters extends Error {
-  override name = 'MissingParameters';
-  constructor(parameterName: string) {
-    super(`Parameter is empty: ${parameterName}`);
+  constructor(message: string) {
+    super(message);
+    this.name = 'MissingParameters';
   }
 }
 
 export class InvalidParameters extends Error {
-  override name = 'InvalidParameters';
-  constructor(message = 'Parameters are invalid') {
+  constructor(message: string) {
     super(message);
+    this.name = 'InvalidParameters';
   }
 }
 
 export class InvalidJsonError extends Error {
-  override name = 'InvalidJsonError';
-  constructor(message = 'Invalid JSON') {
+  constructor(message: string) {
     super(message);
+    this.name = 'InvalidJsonError';
   }
 }
 
 export class UnauthorizedError extends Error {
-  override name = 'UnauthorizedError';
-  constructor(message = 'Unauthorized Error') {
+  constructor(message: string) {
     super(message);
+    this.name = 'UnauthorizedError';
   }
 }

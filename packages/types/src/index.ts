@@ -1,12 +1,13 @@
 export interface ChatRequest {
   message: string;
-  sessionId: string;
+  sessionId?: string;
   userId?: string;
 }
 
 export interface ChatResponse {
   response: string;
   sessionId: string;
+  conversationId: string;
   timestamp: string;
   sources?: DocumentSource[];
 }
@@ -48,6 +49,11 @@ export interface AgentConfig {
   topP?: number;
 }
 
+export interface AuthContext {
+  userId: string;
+  email?: string;
+}
+
 export interface KnowledgeBaseDocument {
   id: string;
   title: string;
@@ -55,6 +61,15 @@ export interface KnowledgeBaseDocument {
   metadata: Record<string, any>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SessionInfo {
+  sessionId: string;
+  userId: string;
+  lastMessage: string;
+  lastResponse: string;
+  timestamp: number;
+  email?: string;
 }
 
 export * from './lambda';
