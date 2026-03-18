@@ -1,7 +1,7 @@
 {
-  "name": "@agentic-app/types",
+  "name": "@agentic-app/core",
   "version": "1.0.0",
-  "description": "Shared TypeScript types for Knowledge Base RAG Agent monorepo",
+  "description": "Shared AWS utilities for Knowledge Base RAG Agent",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -17,9 +17,16 @@
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit"
   },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.700.0",
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0",
+    "@agentic-app/types": "*"
+  },
   "devDependencies": {
     "@agentic-app/config-ts": "*",
     "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^22.10.5",
     "typescript": "^5.7.3"
   }
 }
