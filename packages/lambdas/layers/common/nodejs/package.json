@@ -1,0 +1,18 @@
+{
+  "name": "bedrock-agent-common-layer",
+  "version": "1.0.0",
+  "description": "Common dependencies for Bedrock Agent Lambda functions",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "install:layer": "cd ../nodejs && npm install --production",
+    "build": "echo 'Lambda layer - no build required'",
+    "test": "echo 'Lambda layer - no tests'"
+  },
+  "dependencies": {
+    "@aws-crypto/sha256-js": "^4.0.0",
+    "uuid": "^9.0.1"
+  }
+}

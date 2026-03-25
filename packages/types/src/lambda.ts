@@ -16,4 +16,7 @@ export interface LambdaEnvironment {
   KNOWLEDGE_BASE_ID?: string;
   TABLE_NAME?: string;
   REGION?: string;
+  CLUSTER_ARN?: string;
+  SECRET_ARN?: string;
+  DATABASE_NAME?: string;
 }

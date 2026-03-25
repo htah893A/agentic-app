@@ -1,0 +1,6 @@
+{
+  "name": "api-proxy",
+  "version": "1.0.0",
+  "description": "Lambda function to proxy API requests",
+  "main": "index.js"
+}

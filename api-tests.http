@@ -1,0 +1,248 @@
+###############################################################################
+# AgentCore Runtime API Testing
+# REST Client Extension for VS Code/Cursor
+#
+# Instructions:
+# 1. Install REST Client extension in VS Code/Cursor
+# 2. Update the @password variable with your actual password (from Secrets Manager)
+# 3. Run requests in order:
+#    - First: Authenticate (get token)
+#    - Then: Use any of the API endpoints
+# 4. The JWT token will be automatically extracted and used in subsequent requests
+#
+# Tip: Click "Send Request" above each ### separator
+###############################################################################
+
+### Variables
+@apiEndpoint = https://obeqvq3joj.execute-api.us-east-1.amazonaws.com/v1
+@region = us-east-1
+@userPoolId = us-east-1_rcfI6ZCZB
+@clientId = 4r99qbs1s1l1mpnqghfh00qs3o
+@username = admin@example.com
+
+# TODO: Get your password from AWS Secrets Manager and paste it here:
+# aws secretsmanager get-secret-value --secret-id <InitialUserPasswordSecretArn> --query 'SecretString' --output text | jq -r '.password'
+@password = TestPassword123!
+
+
+###############################################################################
+# AUTHENTICATION
+###############################################################################
+
+### 1. Authenticate with Cognito (Get JWT Token)
+# @name auth
+POST https://cognito-idp.{{region}}.amazonaws.com/ HTTP/1.1
+Content-Type: application/x-amz-json-1.1
+X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth
+
+{
+  "AuthFlow": "USER_PASSWORD_AUTH",
+  "ClientId": "{{clientId}}",
+  "AuthParameters": {
+    "USERNAME": "{{username}}",
+    "PASSWORD": "{{password}}"
+  }
+}
+
+### Extract token from response (automatically used in subsequent requests)
+@authToken = {{auth.response.body.AuthenticationResult.IdToken}}
+
+
+###############################################################################
+# PUBLIC ENDPOINTS (No Authentication Required)
+###############################################################################
+
+### 2. Health Check
+GET {{apiEndpoint}}/api/health HTTP/1.1
+
+
+###############################################################################
+# AUTHENTICATED ENDPOINTS (Require Cognito JWT Token)
+###############################################################################
+
+### 3. Chat - Invoke AgentCore Runtime (Simple Question)
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "What is Pakistan?"
+}
+
+### 4. Chat - With Knowledge Base Query
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "Can you search the knowledge base for information about serverless computing?"
+}
+
+### 5. Chat - Continue Conversation (Use sessionId from previous response)
+# Copy the sessionId from the previous response and paste it below
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "Tell me more about that",
+  "sessionId": "PASTE_SESSION_ID_HERE"
+}
+
+### 6. Chat - New Session with Explicit Message
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "Explain the benefits of using AWS Bedrock for AI applications"
+}
+
+### 7. Get Chat History
+# Replace USER_ID and optional SESSION_ID as query parameters
+GET {{apiEndpoint}}/api/chat/history?userId=YOUR_USER_ID&sessionId=OPTIONAL_SESSION_ID HTTP/1.1
+Authorization: Bearer {{authToken}}
+
+
+###############################################################################
+# KNOWLEDGE BASE ENDPOINTS
+###############################################################################
+
+### 8. Query Knowledge Base Directly
+POST {{apiEndpoint}}/api/knowledge-base/query HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "query": "What are the best practices for serverless architecture?",
+  "maxResults": 5
+}
+
+### 9. List Knowledge Base Documents
+GET {{apiEndpoint}}/api/knowledge-base/documents HTTP/1.1
+Authorization: Bearer {{authToken}}
+
+
+###############################################################################
+# AGENT ENDPOINTS
+###############################################################################
+
+### 10. Get Agent Status
+GET {{apiEndpoint}}/api/agent/status HTTP/1.1
+Authorization: Bearer {{authToken}}
+
+### 11. Agent Configuration
+GET {{apiEndpoint}}/api/agent/config HTTP/1.1
+Authorization: Bearer {{authToken}}
+
+
+###############################################################################
+# TESTING SCENARIOS
+###############################################################################
+
+### Test 1: Quick Response Test
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "Hello! Can you hear me?"
+}
+
+### Test 2: Complex Query
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "What are the main differences between AWS Lambda and traditional server-based computing? Please provide a detailed comparison."
+}
+
+### Test 3: Multi-turn Conversation Simulation
+# First message
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "I want to build a serverless API"
+}
+
+### Test 4: RAG-specific Query
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "Search the knowledge base for information about vector databases and explain what you find"
+}
+
+### Test 5: Error Handling - Empty Message
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": ""
+}
+
+### Test 6: Error Handling - Invalid Session ID
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "Test message",
+  "sessionId": "invalid-session-id-12345"
+}
+
+
+###############################################################################
+# DEBUGGING & MONITORING
+###############################################################################
+
+### Debug: Check Token Validity
+# This will fail with 403 if token is invalid/expired
+GET {{apiEndpoint}}/api/health HTTP/1.1
+Authorization: Bearer {{authToken}}
+
+### Debug: Verbose Response Headers
+POST {{apiEndpoint}}/api/chat/invoke HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "message": "Debug test"
+}
+
+
+###############################################################################
+# NOTES
+###############################################################################
+
+# JWT Token Expiration:
+# - Cognito ID tokens typically expire after 1 hour
+# - If you get 403 Unauthorized, re-run the authentication request (#1)
+#
+# Session Management:
+# - Each new chat request without sessionId creates a new session
+# - Use the returned sessionId to continue the conversation
+# - Sessions are stored in DynamoDB
+#
+# Rate Limits:
+# - 100 requests/second per user
+# - 200 burst limit
+# - 10,000 requests/day quota
+#
+# AgentCore Runtime:
+# - Uses IAM/SigV4 authentication (automatic via Lambda execution role)
+# - Supports streaming responses
+# - Integrates with Knowledge Base for RAG
+# - Maintains conversation memory
+#
+# Endpoints:
+# - POST /api/chat/invoke - Main chat endpoint
+# - GET  /api/chat/history - Retrieve conversation history
+# - POST /api/knowledge-base/query - Direct KB query
+# - GET  /api/agent/status - Agent runtime status
+# - GET  /api/health - Health check (public)

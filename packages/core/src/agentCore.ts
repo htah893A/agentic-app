@@ -1,7 +1,4 @@
-import { HttpRequest } from '@smithy/protocol-http';
-import { SignatureV4 } from '@smithy/signature-v4';
-import { Sha256 } from '@aws-crypto/sha256-js';
-import { defaultProvider } from '@aws-sdk/credential-provider-node';
+import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore';
 import { Logger } from '@aws-lambda-powertools/logger';
 
 export class AgentCore {
@@ -32,74 +29,92 @@ export class AgentCore {
   }
 
   /**
-   * Invoke AgentCore Runtime using SigV4-signed HTTP request
-   * The runtime is deployed as a container and exposes an HTTP endpoint
+   * Invoke AgentCore Runtime using AWS SDK with IAM/SigV4 authentication
+   * The runtime uses the default IAM authentication (no Cognito token needed)
    */
-
   async invokeAgentCoreRuntime(): Promise<string> {
     const region = process.env.AWS_REGION || 'us-east-1';
-    const runtimeId = this.runtimeArn.split('/').pop();
 
-    if (!runtimeId) {
-      throw new Error('Invalid runtime ARN');
-    }
-
-    // AgentCore Runtime endpoint format
-    const hostname = `runtime.bedrock-agentcore.${region}.amazonaws.com`;
-    const path = `/${runtimeId}/invoke`;
+    // Create BedrockAgentCore client
+    const client = new BedrockAgentCoreClient({ region });
 
     // Payload format expected by the agent (see agent/src/main.py)
-    const payload = JSON.stringify({
+    const payload = {
       prompt: this.message,
       session_id: this.sessionId,
       user_id: this.userId,
+    };
+
+    this.logger.info('Invoking AgentCore Runtime', {
+      runtimeArn: this.runtimeArn.substring(0, 50) + '...',
+      userId: this.userId.substring(0, 8) + '...',
+      sessionId: this.sessionId.substring(0, 8) + '...',
     });
 
-    const request = new HttpRequest({
-      hostname: hostname,
-      path: path,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        host: hostname,
-      },
-      body: payload,
-    });
+    try {
+      const commandInput: any = {
+        agentRuntimeArn: this.runtimeArn,
+        payload: new TextEncoder().encode(JSON.stringify(payload)),
+        runtimeUserId: this.userId, // User ID for session management
+        contentType: 'application/json',
+        accept: 'application/json',
+      };
 
-    const signer = new SignatureV4({
-      service: 'bedrock-agentcore',
-      region: region,
-      credentials: defaultProvider(),
-      sha256: Sha256,
-    });
+      // SDK will automatically use IAM/SigV4 authentication from Lambda execution role
+      const command = new InvokeAgentRuntimeCommand(commandInput);
+      const result = await client.send(command);
 
-    const signedRequest = await signer.sign(request);
+      // Read the streaming response
+      if (!result.response) {
+        throw new Error('No response from AgentCore Runtime');
+      }
 
-    this.logger.info('Invoking AgentCore', {
-      hostname,
-      path,
-      runtimeId: runtimeId.substring(0, 20) + '...',
-    });
+      // The response is a streaming blob - collect all chunks
+      const chunks: Uint8Array[] = [];
+      
+      // Handle different possible response types
+      const response = result.response as any;
+      
+      if (response instanceof Uint8Array) {
+        // Direct Uint8Array
+        chunks.push(response);
+      } else if (typeof response[Symbol.asyncIterator] === 'function') {
+        // Async iterable stream
+        for await (const chunk of response) {
+          if (chunk instanceof Uint8Array) {
+            chunks.push(chunk);
+          }
+        }
+      } else if (typeof response === 'string') {
+        // Already a string
+        const responseData = JSON.parse(response);
+        return responseData.response || responseData.text || 'No response from agent';
+      }
 
-    const response = await fetch(`https://${hostname}${path}`, {
-      method: signedRequest.method,
-      headers: signedRequest.headers as Record<string, string>,
-      body: signedRequest.body,
-    });
+      // Combine all chunks
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+      const combined = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+      
+      const responseText = new TextDecoder().decode(combined);
+      const responseData = JSON.parse(responseText);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      this.logger.error('AgentCore invocation failed', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-        hostname,
-        path,
+      this.logger.info('AgentCore response received', {
+        responseLength: responseText.length,
       });
-      throw new Error(`AgentCore invocation failed: ${response.status} - ${errorText}`);
-    }
 
-    const data = (await response.json()) as Record<string, string>;
-    return data.response || data.text || 'No response from agent';
+      return responseData.response || responseData.text || 'No response from agent';
+    } catch (error) {
+      this.logger.error('AgentCore invocation failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+        runtimeArn: this.runtimeArn,
+      });
+      throw error;
+    }
   }
 }

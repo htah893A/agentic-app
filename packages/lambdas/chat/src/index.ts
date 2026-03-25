@@ -158,12 +158,14 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const runtimeArn = AGENTCORE_RUNTIME_ARN!;
 
+    // Runtime uses IAM/SigV4 authentication (no Cognito token needed)
     const agentCore = new AgentCore({
       runtimeArn: runtimeArn,
       sessionId: currentSessionId,
       message: sanitizedMessage,
       userId: userContext.userId,
       logger: logger,
+      // cognitoToken not needed for IAM auth
     });
 
     const responseText = await agentCore.invokeAgentCoreRuntime();
