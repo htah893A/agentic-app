@@ -17,6 +17,9 @@
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit"
   },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
   "devDependencies": {
     "@agentic-app/config-ts": "*",
     "@types/aws-lambda": "^8.10.145",

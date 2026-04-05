@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 export type LambdaHandler = (
@@ -10,13 +11,15 @@ export interface LambdaResponse {
   body: string;
 }
 
-export interface LambdaEnvironment {
-  AGENT_ID?: string;
-  AGENT_ALIAS_ID?: string;
-  KNOWLEDGE_BASE_ID?: string;
-  TABLE_NAME?: string;
-  REGION?: string;
-  CLUSTER_ARN?: string;
-  SECRET_ARN?: string;
-  DATABASE_NAME?: string;
-}
+export const LambdaEnvironmentSchema = z.object({
+  AGENT_ID: z.string().optional(),
+  AGENT_ALIAS_ID: z.string().optional(),
+  KNOWLEDGE_BASE_ID: z.string().optional(),
+  TABLE_NAME: z.string().optional(),
+  REGION: z.string().optional(),
+  CLUSTER_ARN: z.string().optional(),
+  SECRET_ARN: z.string().optional(),
+  DATABASE_NAME: z.string().optional(),
+});
+
+export type LambdaEnvironment = z.infer<typeof LambdaEnvironmentSchema>;

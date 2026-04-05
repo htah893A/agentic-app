@@ -2,7 +2,7 @@ import * as dynamodb from '@aws-sdk/client-dynamodb';
 import { PutItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { AuthorizationError } from './appException';
-import { SessionInfo } from '@agentic-app/types';
+import { SessionInfoSchema } from '@agentic-app/types';
 
 export class Tables {
   dynamodbClient: dynamodb.DynamoDBClient;
@@ -106,8 +106,33 @@ export class Tables {
     }
   }
 
+  async getUserSessions(userId: string): Promise<unknown[]> {
+    try {
+      const result = await this.dynamodbClient.send(
+        new QueryCommand({
+          TableName: this.sessionTable,
+          IndexName: 'UserIdIndex',
+          KeyConditionExpression: 'userId = :userId',
+          ExpressionAttributeValues: {
+            ':userId': { S: userId },
+          },
+          ScanIndexForward: false,
+          Limit: 50,
+        })
+      );
+      return result.Items || [];
+    } catch (error) {
+      this.logger.error('Error retrieving user sessions', {
+        userId: userId.substring(0, 8) + '...',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
   // Store session information in DynamoDB
-  async storeSessionInfo({ sessionId, userId, lastMessage, lastResponse, email }: SessionInfo) {
+  async storeSessionInfo(input: unknown) {
+    const { sessionId, userId, lastMessage, lastResponse, email } = SessionInfoSchema.parse(input);
     await this.dynamodbClient.send(
       new PutItemCommand({
         TableName: this.sessionTable,

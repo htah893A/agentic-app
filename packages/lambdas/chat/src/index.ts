@@ -3,30 +3,18 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { randomBytes } from 'crypto';
 
-import { ChatRequest, ChatResponse, AuthContext } from '@agentic-app/types';
+import { ChatRequestSchema, ChatResponse, AuthContextSchema, ChatLambdaEnvSchema } from '@agentic-app/types';
 import {
   AuthorizationError,
   ValidationError,
-  MissingEnvironmentVariable,
   Tables,
   createSuccessJsonResponse,
   createErrorJsonResponse,
   AgentCore,
 } from '@agentic-app/core';
 
-const { SESSIONS_TABLE, CHAT_HISTORY_TABLE, AGENTCORE_RUNTIME_ARN } = process.env;
-
-if (!SESSIONS_TABLE) {
-  throw new MissingEnvironmentVariable('SESSIONS_TABLE');
-}
-
-if (!CHAT_HISTORY_TABLE) {
-  throw new MissingEnvironmentVariable('CHAT_HISTORY_TABLE');
-}
-
-if (!AGENTCORE_RUNTIME_ARN) {
-  throw new MissingEnvironmentVariable('AGENTCORE_RUNTIME_ARN');
-}
+const env = ChatLambdaEnvSchema.parse(process.env);
+const { SESSIONS_TABLE, CHAT_HISTORY_TABLE, AGENTCORE_RUNTIME_ARN } = env;
 
 // Initialize logger for security audit trails
 const logger = new Logger({ serviceName: 'chat-service' });
@@ -42,25 +30,28 @@ const tables = new Tables({
  * Extract and validate user context from Cognito JWT claims
  * This prevents IDOR attacks by ensuring users can only access their own data
  */
-function extractUserContext(event: APIGatewayProxyEvent): AuthContext {
-  const userId = event.requestContext.authorizer?.claims?.sub;
-  const email = event.requestContext.authorizer?.claims?.email;
+function extractUserContext(event: APIGatewayProxyEvent) {
+  const claims = event.requestContext.authorizer?.claims;
+  const result = AuthContextSchema.safeParse({
+    userId: claims?.sub,
+    email: claims?.email,
+  });
 
-  if (!userId) {
+  if (!result.success) {
     logger.error('Missing user ID in JWT claims', {
       requestId: event.requestContext.requestId,
-      claims: event.requestContext.authorizer?.claims,
+      claims,
     });
     throw new AuthorizationError('Invalid authentication token - missing user ID');
   }
 
   logger.info('User authenticated', {
-    userId: userId.substring(0, 8) + '...',
-    email: email ? email.replace(/(.{2}).*(@.*)/, '$1***$2') : undefined,
+    userId: result.data.userId.substring(0, 8) + '...',
+    email: result.data.email ? result.data.email.replace(/(.{2}).*(@.*)/, '$1***$2') : undefined,
     requestId: event.requestContext.requestId,
   });
 
-  return { userId, email };
+  return result.data;
 }
 
 //Get allowed origin for CORS based on request headers, default to '*' if not present or not in allowed list
@@ -90,7 +81,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Handle GET requests for chat history
     if (event.httpMethod === 'GET') {
+      const listParam = event.queryStringParameters?.list;
       const sessionId = event.queryStringParameters?.sessionId;
+
+      if (listParam === 'sessions') {
+        logger.info('Retrieving user sessions', {
+          userId: userContext.userId.substring(0, 8) + '...',
+          requestId,
+        });
+        const sessions = await tables.getUserSessions(userContext.userId);
+        return createSuccessJsonResponse({ sessions }, origin);
+      }
 
       logger.info('Retrieving chat history', {
         userId: userContext.userId.substring(0, 8) + '...',
@@ -108,16 +109,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       throw new ValidationError('Method not allowed');
     }
 
-    const body: ChatRequest = JSON.parse(event.body || '{}');
-    const { message, sessionId } = body;
-
-    if (!message || typeof message !== 'string') {
-      throw new ValidationError('Message is required and must be a string');
+    const parsed = ChatRequestSchema.safeParse(JSON.parse(event.body || '{}'));
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.issues.map((i) => i.message).join(', '));
     }
-
-    if (message.length > 4000) {
-      throw new ValidationError('Message too long (max 4000 characters)');
-    }
+    const { message, sessionId } = parsed.data;
 
     const sanitizedMessage = sanitizeInput(message);
 
