@@ -8,16 +8,25 @@ export type ChatInvokeResult = {
   sessionId: string;
   conversationId: string;
   timestamp: string;
+  audioBase64?: string;
+  audioFormat?: string;
 };
 
 export async function sendChatMessage(
   message: string,
   sessionId?: string,
+  options?: { audioBase64?: string; language?: string; mode?: 'text' | 'voice' },
 ): Promise<ChatInvokeResult> {
   try {
     return await apiFetch<ChatInvokeResult>('chat/invoke', {
       method: 'POST',
-      body: JSON.stringify({ message, sessionId }),
+      body: JSON.stringify({
+        message,
+        sessionId,
+        audioBase64: options?.audioBase64,
+        language: options?.language,
+        mode: options?.mode || 'text',
+      }),
     });
   } catch (e) {
     if (e instanceof AuthError) redirect('/login');

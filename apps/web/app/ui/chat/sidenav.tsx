@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChatBubbleLeftRightIcon, ClockIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 import { handleSignOut } from '@/app/lib/actions/auth';
 import clsx from 'clsx';
 
 const links = [
-  { name: 'Chat', href: '/chat', icon: ChatBubbleLeftRightIcon },
+  { name: 'Learn', href: '/chat', icon: AcademicCapIcon },
   { name: 'History', href: '/chat/history', icon: ClockIcon },
 ];
 
@@ -20,8 +20,8 @@ export default function ChatSideNav() {
         href="/"
         className="mb-6 flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100"
       >
-        <HomeIcon className="h-5 w-5" />
-        Agentic
+        <span className="text-lg">🌍</span>
+        LangTeacher
       </Link>
       <nav className="flex flex-col gap-1">
         {links.map((link) => {

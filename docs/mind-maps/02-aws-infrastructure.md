@@ -56,6 +56,8 @@
 - DynamoDB Tables (PAY_PER_REQUEST, encrypted, PITR):
   - `AgentCore-ChatHistory` (PK: sessionId, SK: messageId, GSI: UserIdIndex)
   - `AgentCore-Sessions` (PK: sessionId, GSI: UserIdIndex)
+  - `AgentCoreTemplate-LearnerProgress` (PK: userId) — language, level, teacher notes
+  - `AgentCoreTemplate-LearnerReviews` (PK: userId, SK: itemKey) — SM-2 spaced repetition
 - **Dependencies:** `NetworkStack`
 
 #### `AuroraPgVectorStack`
@@ -83,14 +85,21 @@
 - **Dependencies:** `StorageStack`
 
 #### `AgentCoreRuntimeStack`
-- AgentCore Runtime (`knowledge_base_rag_agent`)
-  - Docker image from `agent/` directory (Python, ARM64)
+- AgentCore Runtime (`language_learning_agent`)
+  - Docker image from `agent/` directory (Python 3.13, ARM64)
   - Model: `us.anthropic.claude-sonnet-4-20250514-v1:0`
   - IAM/SigV4 authentication (not Cognito)
   - Lifecycle: 15min idle timeout, 8hr max lifetime
-- IAM permissions: Bedrock models, RDS Data API, Secrets Manager, Knowledge Base, Memory, KMS
+  - Multi-agent system: orchestrator + 4 sub-agents (grammar, vocabulary, conversation, content)
+- S3 Audio Bucket (voice uploads, 1-day lifecycle on `audio-uploads/` prefix)
+- Environment variables injected into container:
+  - `MODEL_ID`, `AGENT_TYPE=orchestrator`
+  - `AURORA_CLUSTER_ENDPOINT`, `AURORA_DATABASE_NAME`, `AURORA_VECTOR_TABLE_NAME`, `AURORA_SECRET_ARN`
+  - `KNOWLEDGE_BASE_ID`, `MEMORY_ID`
+  - `PROGRESS_TABLE`, `REVIEW_TABLE`, `AUDIO_BUCKET`
+- IAM permissions: Bedrock models, RDS Data API, Secrets Manager, Knowledge Base, Memory, DynamoDB (progress + reviews), Polly, Transcribe, S3 (audio), KMS
 - Default endpoint (version 1)
-- **Dependencies:** `AuroraPgVectorStack`, `AgentCoreMemoryStack`
+- **Dependencies:** `AuroraPgVectorStack`, `AgentCoreMemoryStack`, `DatabaseStack`
 
 ### Layer 4: API
 

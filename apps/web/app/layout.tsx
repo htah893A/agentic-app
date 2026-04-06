@@ -2,8 +2,8 @@ import '@/app/ui/global.css';
 import { inter, jetbrainsMono } from '@/app/ui/fonts';
 
 export const metadata = {
-  title: 'Agentic — Chat',
-  description: 'Agent chat console',
+  title: 'LangTeacher — AI Language Learning',
+  description: 'Personal AI language teacher with grammar, vocabulary, conversation practice, and voice training',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

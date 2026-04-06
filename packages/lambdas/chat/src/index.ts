@@ -16,20 +16,14 @@ import {
 const env = ChatLambdaEnvSchema.parse(process.env);
 const { SESSIONS_TABLE, CHAT_HISTORY_TABLE, AGENTCORE_RUNTIME_ARN } = env;
 
-// Initialize logger for security audit trails
 const logger = new Logger({ serviceName: 'chat-service' });
 
-// Intilize DynamoDB tables helper/abstraction layer to encapsulate dynamodb logic and reduce boilerplate in the handler
 const tables = new Tables({
   sessionTable: SESSIONS_TABLE,
   chatHistoryTable: CHAT_HISTORY_TABLE,
   logger,
 });
 
-/**
- * Extract and validate user context from Cognito JWT claims
- * This prevents IDOR attacks by ensuring users can only access their own data
- */
 function extractUserContext(event: APIGatewayProxyEvent) {
   const claims = event.requestContext.authorizer?.claims;
   const result = AuthContextSchema.safeParse({
@@ -54,18 +48,13 @@ function extractUserContext(event: APIGatewayProxyEvent) {
   return result.data;
 }
 
-//Get allowed origin for CORS based on request headers, default to '*' if not present or not in allowed list
 const getOrigin = (event: APIGatewayProxyEvent): string | undefined => {
   return event.headers?.origin || event.headers?.Origin;
 };
 
-/**
- * Sanitize input to prevent injection attacks and log exposure
- */
 function sanitizeInput(input: string): string {
-  // Remove control characters, mask PII patterns
   return input
-    .replace(/[\u0000-\u001F\u007F]/g, '') // Control characters
+    .replace(/[\u0000-\u001F\u007F]/g, '')
     .replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[SSN]')
     .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL]')
     .replace(/\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, '[CARD]')
@@ -100,7 +89,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       });
 
       const history = await tables.getChatHistory(userContext.userId, sessionId);
-
       return createSuccessJsonResponse({ history }, origin);
     }
 
@@ -113,7 +101,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!parsed.success) {
       throw new ValidationError(parsed.error.issues.map((i) => i.message).join(', '));
     }
-    const { message, sessionId } = parsed.data;
+    const { message, sessionId, audioBase64, language, mode } = parsed.data;
 
     const sanitizedMessage = sanitizeInput(message);
 
@@ -121,6 +109,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       userId: userContext.userId.substring(0, 8) + '...',
       messageLength: sanitizedMessage.length,
       sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'new',
+      mode: mode || 'text',
       requestId,
     });
 
@@ -142,7 +131,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       }
       currentSessionId = sessionId;
     } else {
-      // Use cryptographically secure random bytes for session ID generation
       currentSessionId = `${userContext.userId}-${Date.now()}-${randomBytes(8).toString('hex')}`;
     }
 
@@ -154,14 +142,15 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const runtimeArn = AGENTCORE_RUNTIME_ARN!;
 
-    // Runtime uses IAM/SigV4 authentication (no Cognito token needed)
     const agentCore = new AgentCore({
-      runtimeArn: runtimeArn,
+      runtimeArn,
       sessionId: currentSessionId,
       message: sanitizedMessage,
       userId: userContext.userId,
-      logger: logger,
-      // cognitoToken not needed for IAM auth
+      audioBase64,
+      language,
+      mode,
+      logger,
     });
 
     const responseText = await agentCore.invokeAgentCoreRuntime();

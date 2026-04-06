@@ -48,31 +48,42 @@ AgentCore class (packages/core/agentCore.ts)
   ▼
 AgentCore Runtime (Python container on Bedrock AgentCore)
   ├── main.py → @app.entrypoint invoke()
-  ├── Memory retrieval:
-  │   ├── MemoryManager.get_conversation_history()
-  │   └── MemoryManager.retrieve_memories()
-  ├── Context building (last 5 turns + 5 relevant memories)
+  ├── Build context-enriched prompt:
+  │   ├── [User ID, Session ID]
+  │   ├── [Voice Mode] if audio_base64 present
+  │   └── [Target Language] if specified
+  │
+  └── Invoke orchestrator agent (from AgentRegistry)
   │
   ▼
-Strands Agent (agent.py)
-  ├── Model: Claude Sonnet 4 (cross-region inference)
-  ├── System prompt: RAG-first behavior
-  ├── Tool: search_knowledge_base
-  │   │
-  │   ▼
-  │   Bedrock KB Retrieve API
-  │   ├── Knowledge Base (Aurora pgvector storage)
-  │   ├── Embedding: Titan Text v2 (1024-dim)
-  │   ├── Vector search → top-k results
-  │   └── Returns: content + source citations + relevance scores
+Orchestrator Agent (Strands SDK + Claude Sonnet 4)
+  ├── System prompt: personal language teacher
+  ├── Step 1: get_learner_profile(user_id) → DynamoDB
+  │   ├── New student? → Ask target language, level, goals
+  │   └── Returning student? → Check due reviews, greet by name
+  ├── Step 2: Decide action based on message + profile
+  │   ├── Grammar question? → teach_grammar tool → Grammar Agent
+  │   ├── Vocabulary request? → teach_vocabulary tool → Vocabulary Agent
+  │   ├── Conversation practice? → practice_conversation tool → Conversation Agent
+  │   ├── Content request? → generate_content tool → Content Agent
+  │   ├── Review due? → get_due_reviews → test student → record_review_result
+  │   ├── Pronunciation? → text_to_speech (Polly)
+  │   └── General teaching → Orchestrator handles directly
+  ├── Step 3: Sub-agents may call their own tools:
+  │   ├── search_knowledge_base → Bedrock KB Retrieve API → Aurora pgvector
+  │   ├── add_review_items → DynamoDB (LearnerReviews)
+  │   ├── text_to_speech → Amazon Polly (10 languages, neural voices)
+  │   └── speech_to_text → Amazon Transcribe (via S3 audio bucket)
+  ├── Step 4: Orchestrator synthesizes final response
+  └── Step 5: update_learner_progress(user_id, ...) → DynamoDB
   │
   ▼
 Response flows back:
   AgentCore Runtime → Chat Lambda
   │
-  ├── Store session info → DynamoDB (AgentCore-Sessions)
-  ├── Memory store → AgentCore Memory (create_event)
+  ├── MemoryManager.store_interaction() → AgentCore Memory (create_event)
   │   └── Auto-processed by strategies: semantic, user preference, summarization
+  ├── Store session info → DynamoDB (AgentCore-Sessions)
   │
   ▼
 API Gateway → Next.js server action → AgentChat component
@@ -80,6 +91,41 @@ API Gateway → Next.js server action → AgentChat component
       │
       ├── AgentChat appends assistant message to state
       └── If new chat: window.history.replaceState → /chat/{sessionId}
+```
+
+---
+
+## Path 1b: Voice Chat Request (User → AI Response with Audio)
+
+```
+User (Browser — Next.js frontend)
+  │
+  ├── VoiceRecorder component captures audio → base64
+  │   └── handleSend(undefined, audioBase64)
+  │
+  ▼
+Next.js Server Action: sendChatMessage(text, sessionId, { audioBase64, language, mode: 'voice' })
+  │
+  ▼
+[Same path as text: API Gateway → Cognito → Chat Lambda → AgentCore Runtime]
+  │
+  ▼
+main.py invoke():
+  ├── Detects mode='voice' + audio_base64
+  ├── Adds voice context to prompt:
+  │   "[Voice Mode: student sent audio in {language}.
+  │    Use speech_to_text to transcribe, then respond.
+  │    Use text_to_speech for your response.]"
+  ├── Stores audio in env vars for tool access
+  │
+  ▼
+Orchestrator Agent:
+  ├── speech_to_text tool → S3 upload → Amazon Transcribe
+  │   └── Returns: { transcription, confidence, language }
+  ├── Processes transcribed text as normal
+  ├── text_to_speech tool → Amazon Polly (neural voice)
+  │   └── Returns: { audio_base64, format: 'mp3', voice, text }
+  └── Response includes both text and audio
 ```
 
 ---

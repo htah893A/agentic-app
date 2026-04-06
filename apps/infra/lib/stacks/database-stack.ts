@@ -39,6 +39,27 @@ export class DatabaseStack extends cdk.Stack {
         removalPolicy: cdk.RemovalPolicy.RETAIN,
         pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       }),
+
+      // Learner progress table - tracks language learning progress per user
+      learnerProgress: new dynamodb.Table(this, 'LearnerProgressTable', {
+        tableName: 'AgentCoreTemplate-LearnerProgress',
+        partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        encryption: dynamodb.TableEncryption.AWS_MANAGED,
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+        pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      }),
+
+      // Spaced repetition review items table
+      learnerReviews: new dynamodb.Table(this, 'LearnerReviewsTable', {
+        tableName: 'AgentCoreTemplate-LearnerReviews',
+        partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+        sortKey: { name: 'itemKey', type: dynamodb.AttributeType.STRING },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        encryption: dynamodb.TableEncryption.AWS_MANAGED,
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+        pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      }),
     };
 
     // Add GSI to chat history table for querying by user

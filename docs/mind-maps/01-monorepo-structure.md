@@ -12,7 +12,25 @@
 - `lib/stacks/` — 12 CDK stacks
 - `lib/constructs/` — reusable CDK constructs
 - `lib/utils/` — constants, nag suppressions
-- `agent/` — Python agent code (Strands + BedrockAgentCoreApp)
+- `agent/` — Python multi-agent system (Strands SDK + BedrockAgentCoreApp)
+  - `src/main.py` — entry point, `@app.entrypoint invoke()`
+  - `src/agent.py` — backward-compatible wrapper
+  - `src/memory.py` — `MemoryManager` (AgentCore Memory create_event)
+  - `src/agents/` — agent definitions (registry pattern)
+    - `registry.py` — `AgentRegistry` singleton, `create_bedrock_model()`
+    - `orchestrator.py` — central teacher agent (delegates to sub-agents)
+    - `grammar.py` — grammar specialist sub-agent
+    - `vocabulary.py` — vocabulary specialist sub-agent
+    - `conversation.py` — conversation practice sub-agent
+    - `content.py` — content generation sub-agent
+  - `src/tools/` — `@tool`-decorated functions
+    - `sub_agents.py` — wrappers that invoke sub-agents as tools
+    - `knowledge_base.py` — Bedrock KB Retrieve API search
+    - `progress.py` — learner profile CRUD (DynamoDB)
+    - `review.py` — SM-2 spaced repetition (DynamoDB)
+    - `voice.py` — Polly TTS + Transcribe STT
+  - `Dockerfile` — Python 3.13, ARM64, non-root user
+  - `requirements.txt` — bedrock-agentcore, strands-agents, boto3
 - `test/` — Jest tests for stacks and Lambda functions
 
 ### `apps/web/` → `@agentic-app/web`
@@ -50,15 +68,24 @@
 ### `packages/types/` → `@agentic-app/types`
 - Shared TypeScript interfaces
 - `ChatRequest`, `ChatResponse`, `AuthContext`, `SessionInfo`, etc.
+- `AgentCoreConfigSchema`, `AgentCoreResponseSchema`, `ChatLambdaEnvSchema`
+- `LearnerProfileSchema`, `ReviewItemSchema`, `ProgressResponseSchema`
+- `SupportedLanguageSchema` (10 languages)
 - `LambdaHandler`, `LambdaEnvironment` types
+- All schemas use Zod for runtime validation
 - **No dependencies** on other workspace packages
 
 ### `packages/core/` → `@agentic-app/core`
 - Shared AWS utilities
 - `AgentCore` — Bedrock AgentCore Runtime SDK client
+  - `invokeAgentCoreRuntime()` — sends payload, handles streaming response
+  - Validates config with `AgentCoreConfigSchema`
+  - Supports text and voice mode (audioBase64, language)
 - `Tables` — DynamoDB abstraction (sessions, chat history)
-  - `listUserSessions(userId)` — queries Sessions table via `UserIdIndex` GSI
-  - Unmarshalls DynamoDB items via `@aws-sdk/util-dynamodb`
+  - `validateSessionOwnership(sessionId, userId)` — IDOR prevention
+  - `getChatHistory(userId, sessionId?)` — query by session or user
+  - `getUserSessions(userId)` — queries Sessions table via `UserIdIndex` GSI
+  - `storeSessionInfo(input)` — validated via `SessionInfoSchema`
 - `gatewayResponse` — API Gateway response helpers
 - `appException` — custom error classes
 - **Depends on:** `@agentic-app/types`

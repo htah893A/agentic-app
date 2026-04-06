@@ -27,13 +27,14 @@ CDK Deploy (--all, dependency order)
   │
   ├── Layer 2:
   │   ├── AgentCoreCognitoStack → User Pool, Identity Pool, Initial User
-  │   ├── AgentCoreDatabaseStack → DynamoDB tables (depends: Network)
+  │   ├── AgentCoreDatabaseStack → DynamoDB tables: ChatHistory, Sessions, LearnerProgress, LearnerReviews (depends: Network)
   │   └── AgentCoreAuroraPgVectorStack → Aurora, KB (depends: Network, Shared)
   │
   ├── Layer 3:
   │   ├── AgentCoreMemoryStack → AgentCore Memory (depends: Storage)
-  │   └── AgentCoreRuntimeStack → AgentCore Runtime (depends: Aurora, Memory)
+  │   └── AgentCoreRuntimeStack → AgentCore Runtime (depends: Aurora, Memory, Database)
   │       └── Docker build: agent/ → ARM64 container → AgentCore
+  │           (multi-agent: orchestrator + grammar + vocabulary + conversation + content)
   │
   ├── Layer 4:
   │   └── AgentCoreApiStack → API Gateway, Chat Lambda (depends: Network, Cognito, Shared, Runtime)

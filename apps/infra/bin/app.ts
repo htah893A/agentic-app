@@ -181,9 +181,11 @@ agentCoreMemoryStack.addDependency(storageStack);
 // AgentCore Runtime depends on:
 // - Aurora pgvector (for RAG)
 // - Memory (for conversation context)
+// - Database (for learner progress + review tables)
 // Note: Using IAM authentication, not Cognito
 agentCoreRuntimeStack.addDependency(auroraPgVectorStack);
 agentCoreRuntimeStack.addDependency(agentCoreMemoryStack);
+agentCoreRuntimeStack.addDependency(databaseStack);
 
 // API layer dependencies
 apiStack.addDependency(networkStack);
